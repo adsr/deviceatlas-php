@@ -1,8 +1,8 @@
 FROM debian:testing-slim
 
-COPY input /input
-
 RUN apt-get update && apt-get -y install unzip cmake g++
+
+COPY input /input
 
 RUN /input/build.sh
 

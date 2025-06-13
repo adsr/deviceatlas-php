@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     size_t evidence_len = 0;
     int i;
     for (i = 1; i < argc; i += 2) {
-        printf("  %s %s\n", argv[i], argv[i + 1]);
+        printf("  %32s => %s\n", argv[i], argv[i + 1]);
         da_evidence_id_t evidence_id = da_atlas_header_evidence_id(&atlas, argv[i]);
         if (evidence_id == (da_evidence_id_t)-1) continue;
         evidence[evidence_len].key = evidence_id;
