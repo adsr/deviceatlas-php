@@ -3,6 +3,12 @@ deviceatlas test
 --INI--
 deviceatlas.json_path={PWD}/data.json
 deviceatlas.cache_size=1024
+--SKIPIF--
+<?php
+if (!file_exists(sprintf('%s/data.json', __DIR__))) {
+    die('skip due to missing data.json');
+}
+?>
 --EXTENSIONS--
 deviceatlas
 --FILE--
