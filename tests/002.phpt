@@ -1,12 +1,12 @@
 --TEST--
-deviceatlas JSON test
+deviceatlas bin test
 --INI--
-deviceatlas.json_path={PWD}/data.json
+deviceatlas.bin_path={PWD}/data.bin
 deviceatlas.cache_size=1024
 --SKIPIF--
 <?php
-if (!file_exists(sprintf('%s/data.json', __DIR__))) {
-    die('skip due to missing data.json');
+if (!file_exists(sprintf('%s/data.bin', __DIR__))) {
+    die('skip due to missing data.bin');
 }
 ?>
 --EXTENSIONS--
@@ -41,7 +41,7 @@ ksort($props);
 var_dump($props);
 ?>
 --EXPECT--
-array(20) {
+array(19) {
   ["browserName"]=>
   string(6) "Chrome"
   ["browserRenderingEngine"]=>
@@ -74,8 +74,6 @@ array(20) {
   bool(false)
   ["osName"]=>
   string(5) "Linux"
-  ["osVersion"]=>
-  string(6) "6.11.7"
   ["osiOs"]=>
   bool(false)
   ["primaryHardwareType"]=>

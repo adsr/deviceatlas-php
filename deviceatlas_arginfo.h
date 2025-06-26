@@ -1,8 +1,11 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: a1f297d8c65337c05dbe531ea2d0e98dbe2f70ac */
+ * Stub hash: 73f054a6d79a03cf994b33ea7c3e81b279434510 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_deviceatlas_get_properties, 0, 1, MAY_BE_ARRAY|MAY_BE_FALSE)
 	ZEND_ARG_TYPE_INFO(0, headers, IS_ARRAY, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_deviceatlas_is_initialized, 0, 0, _IS_BOOL, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_deviceatlas_last_error, 0, 0, IS_LONG, 0)
@@ -12,11 +15,13 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_deviceatlas_last_error_msg, 0, 0
 ZEND_END_ARG_INFO()
 
 ZEND_FUNCTION(deviceatlas_get_properties);
+ZEND_FUNCTION(deviceatlas_is_initialized);
 ZEND_FUNCTION(deviceatlas_last_error);
 ZEND_FUNCTION(deviceatlas_last_error_msg);
 
 static const zend_function_entry ext_functions[] = {
 	ZEND_FE(deviceatlas_get_properties, arginfo_deviceatlas_get_properties)
+	ZEND_FE(deviceatlas_is_initialized, arginfo_deviceatlas_is_initialized)
 	ZEND_FE(deviceatlas_last_error, arginfo_deviceatlas_last_error)
 	ZEND_FE(deviceatlas_last_error_msg, arginfo_deviceatlas_last_error_msg)
 	ZEND_FE_END

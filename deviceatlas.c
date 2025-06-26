@@ -10,13 +10,18 @@
 #include <dac.h>
 
 ZEND_DECLARE_MODULE_GLOBALS(deviceatlas)
+static PHP_MINFO_FUNCTION(deviceatlas);
 static PHP_MINIT_FUNCTION(deviceatlas);
 static PHP_MSHUTDOWN_FUNCTION(deviceatlas);
-static PHP_MINFO_FUNCTION(deviceatlas);
+static size_t deviceatlas_filereader(void *ctx, size_t count, char *buf);
+static da_status_t deviceatlas_fileseeker(void *ctx, off_t pos);
+static void deviceatlas_error_handler(da_severity_t severity, da_status_t status, const char *msg, va_list args);
 static int deviceatlas_maybe_initialize(void);
-static void deviceatlas_clear_last_err(void);
 static void deviceatlas_error_cb(da_severity_t severity, da_status_t status, const char *msg, va_list args);
+static void deviceatlas_clear_last_err(void);
+static void deviceatlas_set_last_err_va(int err, const char *fmt, va_list vl);
 static void deviceatlas_set_last_err(int err, const char *fmt, ...);
+
 
 zend_module_entry deviceatlas_module_entry = {
     STANDARD_MODULE_HEADER,
@@ -39,7 +44,7 @@ ZEND_GET_MODULE(deviceatlas)
 #endif
 
 PHP_INI_BEGIN()
-    // STD_PHP_INI_ENTRY("deviceatlas.bin_path", "", PHP_INI_ALL, OnUpdateString, bin_path, zend_deviceatlas_globals, deviceatlas_globals)
+    STD_PHP_INI_ENTRY("deviceatlas.bin_path", "", PHP_INI_ALL, OnUpdateString, bin_path, zend_deviceatlas_globals, deviceatlas_globals)
     STD_PHP_INI_ENTRY("deviceatlas.json_path", "", PHP_INI_ALL, OnUpdateString, json_path, zend_deviceatlas_globals, deviceatlas_globals)
     STD_PHP_INI_ENTRY("deviceatlas.cache_size", "0", PHP_INI_ALL, OnUpdateLong, cache_size, zend_deviceatlas_globals, deviceatlas_globals)
 PHP_INI_END()
@@ -76,12 +81,18 @@ static PHP_MSHUTDOWN_FUNCTION(deviceatlas) {
     return SUCCESS;
 }
 
-static size_t filereader(void *ctx, size_t count, char *buf) {
+static size_t deviceatlas_filereader(void *ctx, size_t count, char *buf) {
    return fread(buf, 1, count, ctx);
 }
 
-static da_status_t fileseeker(void *ctx, off_t pos) {
+static da_status_t deviceatlas_fileseeker(void *ctx, off_t pos) {
    return fseek(ctx, pos, SEEK_SET) != -1 ? DA_OK : DA_SYS;
+}
+
+static void deviceatlas_error_handler(da_severity_t severity, da_status_t status, const char *msg, va_list args) {
+    if (status != DA_OK) {
+        deviceatlas_set_last_err_va(status, msg, args);
+    }
 }
 
 static int deviceatlas_maybe_initialize(void) {
@@ -90,52 +101,68 @@ static int deviceatlas_maybe_initialize(void) {
         return 1;
     }
 
-    if (!DA_G(json_path) || strlen(DA_G(json_path)) <= 0) {
-        deviceatlas_set_last_err(DA_PHP_EMPTY_PATH, "Empty json_path");
+    // Do we have a JSON or compiled db?
+    int has_bin  = DA_G(bin_path)  && strlen(DA_G(bin_path))  > 0 ? 1 : 0;
+    int has_json = DA_G(json_path) && strlen(DA_G(json_path)) > 0 ? 1 : 0;
+    if (!has_bin && !has_json) {
+        deviceatlas_set_last_err(DA_PHP_EMPTY_PATH, "Empty bin_path and json_path");
         return 0;
     }
 
+    // Set error handler. The library invokes this when there's an error.
+    // We use it to set last_err.
+    da_seterrorfunc(deviceatlas_error_handler);
+
+    // Start init
     da_status_t status;
     if ((status = da_init()) != DA_OK) {
         return 0;
     }
 
-    void *ptr;
-    size_t ptr_size;
-    /*
-    void *m;
-    if ((status = da_atlas_read_mapped(DA_G(bin_path), m, &ptr, &ptr_size)) != DA_OK) {
-        da_fini();
-        return 0;
-    }
-    */
+    void *ptr = NULL;
+    size_t ptr_size = 0;
+    void *m = NULL;
 
-    FILE *json = fopen(DA_G(json_path), "r");
-    if (!json) {
-        deviceatlas_set_last_err(DA_PHP_BAD_PATH, "Could not read json_path");
-        return 0;
+    if (has_bin) {
+        // Read binary db
+        if ((status = da_atlas_read_mapped(DA_G(bin_path), m, &ptr, &ptr_size)) != DA_OK) {
+            goto deviceatlas_maybe_initialize_err;
+        }
+    } else if (has_json) {
+        // Read JSON
+        FILE *json = fopen(DA_G(json_path), "r");
+        if (!json) {
+            deviceatlas_set_last_err(DA_PHP_BAD_PATH, "Could not read json_path");
+            goto deviceatlas_maybe_initialize_err;
+        }
+
+        // Compile JSON into db
+        status = da_atlas_compile(json, deviceatlas_filereader, deviceatlas_fileseeker, &ptr, &ptr_size);
+        fclose(json);
+        if (status != DA_OK) {
+            goto deviceatlas_maybe_initialize_err;
+        }
     }
 
-    status = da_atlas_compile(json, filereader, fileseeker, &ptr, &ptr_size);
-    fclose(json);
-    if (status != DA_OK) {
-        da_fini();
-        return 0;
-    }
-
+    // Open db
     da_property_decl_t extraprops[] = {{ 0, 0 }};
     if ((status = da_atlas_open(&DA_G(atlas), extraprops, ptr, ptr_size)) != DA_OK) {
-        free(ptr);
-        da_fini();
-        return 0;
+        goto deviceatlas_maybe_initialize_err;
     }
 
+    // Finish init
     DA_G(atlas).config.cache_size = DA_G(cache_size);
     DA_G(atlas_ptr) = ptr;
     DA_G(atlas_ptr_size) = ptr_size;
     DA_G(initialized) = 1;
 
     return 1;
+
+deviceatlas_maybe_initialize_err:
+
+    if (ptr) free(ptr);
+    da_fini();
+    return 0;
 }
 
 static void deviceatlas_error_cb(da_severity_t severity, da_status_t status, const char *msg, va_list args) {
@@ -148,11 +175,15 @@ static void deviceatlas_clear_last_err(void) {
     DA_G(last_err_msg)[0] = '\0';
 }
 
+static void deviceatlas_set_last_err_va(int err, const char *fmt, va_list vl) {
+    DA_G(last_err) = err;
+    vsnprintf(DA_G(last_err_msg), sizeof(DA_G(last_err_msg)), fmt, vl);
+}
+
 static void deviceatlas_set_last_err(int err, const char *fmt, ...) {
     va_list vl;
     va_start(vl, fmt);
-    DA_G(last_err) = err;
-    vsnprintf(DA_G(last_err_msg), sizeof(DA_G(last_err_msg)), fmt, vl);
+    deviceatlas_set_last_err_va(err, fmt, vl);
 }
 
 PHP_FUNCTION(deviceatlas_get_properties) {
@@ -235,6 +266,11 @@ PHP_FUNCTION(deviceatlas_get_properties) {
     }
 
     da_close(&device);
+}
+
+PHP_FUNCTION(deviceatlas_is_initialized) {
+    ZEND_PARSE_PARAMETERS_NONE();
+    RETURN_BOOL(DA_G(initialized));
 }
 
 PHP_FUNCTION(deviceatlas_last_error) {

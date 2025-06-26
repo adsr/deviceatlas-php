@@ -6,11 +6,11 @@
 extern zend_module_entry deviceatlas_module_entry;
 #define phpext_deviceatlas_ptr &deviceatlas_module_entry
 
-#define PHP_DEVICEATLAS_VERSION "0.1.0"
+#define PHP_DEVICEATLAS_VERSION "0.2.0"
 
 ZEND_BEGIN_MODULE_GLOBALS(deviceatlas)
     int initialized;
-    // char *bin_path;
+    char *bin_path;
     char *json_path;
     zend_long cache_size;
     void *atlas_ptr;

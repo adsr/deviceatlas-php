@@ -105,5 +105,6 @@ const DA_PHP_BAD_PATH = UNKNOWN;
 const DA_PHP_NO_MEM = UNKNOWN;
 
 function deviceatlas_get_properties(array $headers): array|false {}
+function deviceatlas_is_initialized(): bool {}
 function deviceatlas_last_error(): int {}
 function deviceatlas_last_error_msg(): string {}
